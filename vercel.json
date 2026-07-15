@@ -3,11 +3,10 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "includeFiles": "data/reference_data.pkl"
+      "includeFiles": "{data/reference_data.pkl,webapp/index.html}"
     }
   },
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/api/(.*)", "destination": "/api/index.py" }
+    { "source": "/(.*)", "destination": "/api/index.py" }
   ]
 }
