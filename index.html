@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spectra Match</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:#15202b;background:#f4f7fb}
+    *{box-sizing:border-box} body{margin:0}.wrap{max-width:1100px;margin:auto;padding:32px 18px 60px}
+    .hero{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:white;border-radius:22px;padding:30px;box-shadow:0 18px 40px #0f172a22}
+    h1{margin:0 0 8px;font-size:clamp(28px,5vw,48px)}.hero p{margin:0;opacity:.86}
+    .panel{background:white;border-radius:18px;padding:22px;margin-top:20px;box-shadow:0 10px 28px #0f172a12}
+    .drop{border:2px dashed #a5b4fc;border-radius:16px;padding:28px;text-align:center;background:#f8faff}
+    input[type=file]{max-width:100%} button{border:0;border-radius:11px;background:#1d4ed8;color:white;padding:12px 18px;font-weight:700;cursor:pointer;margin-top:14px}
+    button:disabled{opacity:.45;cursor:not-allowed}.status{margin-left:12px;color:#475569}.error{color:#b91c1c;background:#fee2e2;padding:12px;border-radius:10px;margin-top:14px}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:18px}.card{background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:14px}.card b{display:block;font-size:24px;margin-top:5px}
+    .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.gallery img{width:100%;border:1px solid #e2e8f0;border-radius:12px}
+    table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:right}th{background:#f8fafc;position:sticky;top:0}th:last-child,td:last-child{text-align:left}.tablewrap{max-height:440px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}.secondary{background:#0f766e}.hidden{display:none}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#dbeafe;color:#1e40af;font-weight:700}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero"><h1>Spectra Match</h1><p>Upload a Raman spectrum text file and compare it with the bundled reference library using NC and HQI.</p></section>
+  <section class="panel">
+    <form id="form">
+      <div class="drop"><input id="file" name="file" type="file" accept=".txt,text/plain" required><div>Maximum upload: 4 MB · Maximum spectra: 1,200</div></div>
+      <button id="run" type="submit">Run matching</button><span id="status" class="status"></span>
+    </form>
+    <div id="error" class="error hidden"></div>
+  </section>
+  <section id="results" class="panel hidden">
+    <div class="actions"><button id="csv" class="secondary">Download result CSV</button><button id="json" class="secondary">Download JSON</button></div>
+    <h2>Result: <span id="sample"></span></h2><span id="confidence" class="badge"></span>
+    <div id="cards" class="cards"></div>
+    <h3>Figures</h3><div id="figures" class="gallery"></div>
+    <h3>Top matches</h3><div class="tablewrap"><table><thead><tr><th>X</th><th>Y</th><th>Max NC</th><th>Max HQI</th><th>Qualifying</th><th>Organism</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</div>
+<script>
+const form=document.querySelector('#form'), fileInput=document.querySelector('#file'), run=document.querySelector('#run');
+const statusEl=document.querySelector('#status'), errorEl=document.querySelector('#error'), results=document.querySelector('#results');
+let lastResult=null;
+form.addEventListener('submit', async (event)=>{
+  event.preventDefault(); errorEl.classList.add('hidden'); results.classList.add('hidden'); run.disabled=true; statusEl.textContent='Processing…';
+  try{
+    const data=new FormData(); data.append('file',fileInput.files[0]);
+    const response=await fetch('/api/match',{method:'POST',body:data});
+    const body=await response.json(); if(!response.ok) throw new Error(body.detail||'Request failed');
+    lastResult=body; render(body); results.classList.remove('hidden'); statusEl.textContent='Complete';
+  }catch(err){errorEl.textContent=err.message;errorEl.classList.remove('hidden');statusEl.textContent='';}
+  finally{run.disabled=false;}
+});
+function render(data){
+  document.querySelector('#sample').textContent=data.sample; document.querySelector('#confidence').textContent=`Confidence: ${data.summary.confidence}`;
+  const s=data.summary, cards=[['Total spectra',s.total_spectra],['Qualifying',s.qualifying_spectra],['Rejected',s.rejected_spectra],['Dominant organism',s.dominant_organism||'No confident match'],['Dominant fraction',pct(s.dominant_fraction)],['NC/HQI agreement',pct(s.nc_hqi_organism_agreement)]];
+  document.querySelector('#cards').innerHTML=cards.map(([k,v])=>`<div class="card">${esc(k)}<b>${esc(String(v))}</b></div>`).join('');
+  document.querySelector('#figures').innerHTML=Object.entries(data.figures).map(([k,v])=>`<figure><img src="${v}" alt="${esc(k)}"><figcaption>${esc(k)}</figcaption></figure>`).join('');
+  document.querySelector('#rows').innerHTML=data.top_matches.map(r=>`<tr><td>${num(r.X)}</td><td>${num(r.Y)}</td><td>${num(r.Max_NC,4)}</td><td>${num(r.Max_HQI,4)}</td><td>${r.Qualifying?'Yes':'No'}</td><td>${esc(r.Organism_NC)}</td></tr>`).join('');
+}
+function pct(x){return `${(Number(x||0)*100).toFixed(1)}%`} function num(x,d=2){return Number(x).toFixed(d)} function esc(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function download(name,text,type){const blob=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+document.querySelector('#json').onclick=()=>lastResult&&download(`${lastResult.sample}_results.json`,JSON.stringify(lastResult,null,2),'application/json');
+document.querySelector('#csv').onclick=()=>{if(!lastResult)return;const rows=lastResult.rows, cols=Object.keys(rows[0]||{});const csv=[cols.join(','),...rows.map(r=>cols.map(c=>`"${String(r[c]??'').replaceAll('"','""')}"`).join(','))].join('\n');download(`${lastResult.sample}_results.csv`,csv,'text/csv')};
+</script>
+</body></html>
