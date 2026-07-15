@@ -28,7 +28,7 @@ from preprocessing_utils import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-INDEX_HTML = ROOT / "public" / "index.html"
+INDEX_HTML = ROOT / "webapp" / "index.html"
 REFERENCE_FILE = ROOT / "data" / "reference_data.pkl"
 MAX_UPLOAD_BYTES = 4_000_000  # stays below Vercel's 4.5 MB request limit
 MAX_SPECTRA = 1200
