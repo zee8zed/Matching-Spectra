@@ -1,0 +1,8 @@
+fastapi==0.116.1
+python-multipart==0.0.20
+numpy==2.2.6
+pandas==2.2.3
+scipy==1.15.3
+pybaselines==1.2.1
+joblib==1.5.1
+matplotlib==3.10.3
