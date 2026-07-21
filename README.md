@@ -1,5 +1,4 @@
-# Spectra Match — Vercel edition
-
+# Spectra Match 
 This project converts the original desktop/Gradio workflow into a stateless FastAPI application for Vercel.
 
 ## Project layout
